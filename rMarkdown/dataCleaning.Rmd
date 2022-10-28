@@ -40,12 +40,12 @@ extractForceData<-function(folders){
     mutate(testDate=ymd(str_extract(i,"2014 \\d+ \\d+")), #Extract date of testing
            animalID=str_extract(file,"^\\d*"),            #Extract animal ID
            animalSide=str_extract(file,"(?<=\\d)\\D"),    #Extract the side of the animal tested (L/R)
-           femurSide=str_extract(file,"(?<=\\D)\\D"),     #Extract the side of the femur tested (L/M)
+           archSide=str_extract(file,"(?<=\\D)\\D"),     #Extract the side of the arch tested (L/M)
            testNum=if_else(str_detect(file,"-"),str_extract(file,"(?<=-)\\d"),"1"), #Extract which test the implant failed on
            testMeth=if_else(str_detect(file,"S"),"S","T"), #Extract the method of testing
            fullPath=as.character(glue("{folders[1]}/{file}")), #Create the full path
            data=map(fullPath,~read_delim(.x,col_names=F,col_types = "n",delim="\t")))%>% #Extract the data from the file
-    mutate(across(animalSide:femurSide,~str_to_upper(.x)))
+    mutate(across(animalSide:archSide,~str_to_upper(.x)))
   return(dat)
 }
 
@@ -85,11 +85,11 @@ data<-rawData%>%
   rowwise()%>%
   mutate(force=max(data$X2))%>% #Find the disruption force from each dataset (due to rowwise above)
   ungroup()%>%
-  select(animalID,testDate,animalSide,femurSide,testMeth,force)%>% #Select relevant fields
+  select(animalID,testDate,animalSide,archSide,testMeth,force)%>% #Select relevant fields
   arrange(as.numeric(animalID))%>%
   left_join(legendData,by=c("animalID","animalSide"))%>% #Join on relevant fields
   mutate(animalSide=factor(animalSide,levels=c("L","R"),labels=c("Left","Right")), #Re-factored names to make more readable
-         femurSide=factor(femurSide,levels=c("L","M"),labels=c("Lateral","Medial")),
+         archSide=factor(archSide,levels=c("L","M"),labels=c("Lateral","Medial")),
          testMethod=factor(testMeth,levels=c("S","T"),labels=c("Shear","Tension")),
          implantType=factor(ImplantType,levels=c("B","A"),labels=c("BAE+DCD","BAE")),
          time=as.numeric(testDate-Surgery_Date),         

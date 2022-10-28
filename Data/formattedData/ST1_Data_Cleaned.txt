@@ -1,4 +1,4 @@
-animalID	animalSide	femurSide	force	testMethod	implantType	time
+animalID	animalSide	archSide	force	testMethod	implantType	time
 1	Right	Medial	24.854	Tension	BAE+DCD	168
 2	Left	Lateral	40.381	Tension	BAE+DCD	168
 2	Left	Medial	11.328	Tension	BAE+DCD	168
