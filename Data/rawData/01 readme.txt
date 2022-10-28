@@ -1,5 +1,18 @@
 Folders ending in "Copy" contain the data collected from disruption tests of rectangular implants placed in the femora of male wistar rats.
 
+
+Expected numbers:
+120 animals each recieving 2 implants			->240 implants
+240 implants each beig tested twice (Lateral/Medial)	->480 force measurements
+2 implant types						->240 force measurements/implant
+2 arches						->120 force measurements/implant/arch
+6 time points						->20  force measurements/implant/arch/time point
+2 sides to animal					->10  force measurements/implant/arch/time point/animal side
+2 test methods						->5   force measurements/implant/arch/time point/animal side/test method
+
+
+
+
 Notes: All implants should have been collected from 1 of 6 time points (5,9,14,28,84,168 days). Times outside of this range should if close (difference of 1 should be added to closest time point)
 
 Example file names
