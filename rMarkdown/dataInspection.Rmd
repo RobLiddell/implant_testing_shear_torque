@@ -1,0 +1,98 @@
+---
+title: "Inspect Data for Quality"
+author: "Robert Liddell"
+date: "2022-10-27"
+knit: (function(inputFile, encoding) {
+      rmarkdown::render(inputFile, encoding = encoding, output_dir = "html") })
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(glue)
+library(lubridate)
+```
+
+
+
+```{r Data Loading, include=FALSE}
+dataPath<-"../Data/formattedData/ST1_Data_Cleaned.txt"
+
+data<-read_tsv(dataPath,col_types = list(col_character(),
+                                   col_factor(levels=c("Right","Left")),
+                                   col_factor(levels=c("Lateral","Medial")),
+                                   col_double(),
+                                   col_factor(levels=c("Tension","Shear")),
+                                   col_factor(levels=c("BAE","BAE+DCD")),
+                                   col_double()),
+               lazy=FALSE)
+
+
+```
+
+# Goal
+The intention of this document is to inspect the data for quality and to understand the data we have
+
+## Data Counts
+
+The study was designed to place 240 implants (120/implant group) into 120 rats. with each implant being tested twice due to the lateral and medial arches this would result in 480 different test files if all samples were tested. These 480 different tests would be split between the 2 testing methods (Shear/Tension), 2 implant types (BAE/BAE+DCD), 2 arches (Lateral/Medial), 2 animal sides (Left/Right) and 6 time points (5/9/14/28/84/168 days). We would expect 5 tests per each of these groupings, However both arches from a test were typically used for the same testing method, as such it could be 4 or 6. This also does not take into account lost samples nor the animals included to try and cover for these loses. The loss of samples during preparation was largely due to hardware failure as opposed to any inherent difference in the sample, but it did result in many lost samples at the 168 day time point.
+```{r Group Counts}
+
+groupCounts<-data%>%
+  group_by(implantType,testMethod,time,archSide,animalSide)%>%
+  summarise(Count=n())%>%
+  ungroup()%>%
+  ggplot(aes(x=factor(time),y=Count))+
+  geom_col()+
+  facet_grid(rows=vars(implantType,testMethod),
+             cols=vars(archSide,animalSide))+
+  geom_hline(aes(yintercept=4),lty=2)+
+  geom_hline(aes(yintercept=6),lty=2)+
+  labs(title="Data Counts",x="Time",
+       caption = "The 168 day time point is missing the majority of the data. \n Note: Dotted lines indicated expected range of number of tested samples")
+
+groupCounts
+```
+
+
+
+```{r Force Distributions - Individual}
+
+data%>%
+  group_by(animalSide,implantType,testMethod,archSide,time)%>%
+  mutate(forceStandardized=(force-mean(force))/sd(force))%>%
+  drop_na(forceStandardized)%>%
+  arrange(forceStandardized)%>%
+  mutate(expectedZ=qnorm(row_number()/n()))%>%
+  arrange(animalSide,implantType,testMethod,archSide,time)%>%
+  filter(is.finite(expectedZ))%>%
+  ggplot(aes(x=expectedZ,y=forceStandardized))+
+  geom_point()+
+  geom_abline(aes(slope=1,intercept=0))+
+  facet_grid(rows=vars(animalSide,archSide),
+             cols=vars(testMethod,implantType))+
+  labs(title="Individual Q-Q plots",x="Expected Z-Score",y="Standardized Force Data",
+       caption = "No trends can be seen in the individual q-q plots")
+
+
+
+```
+```{r Force Distributions - Combined}
+data%>%
+  group_by(animalSide,implantType,testMethod,archSide,time)%>%
+  mutate(forceStandardized=(force-mean(force))/sd(force))%>%
+  ungroup()%>%
+  drop_na(forceStandardized)%>%
+  arrange(forceStandardized)%>%
+  mutate(expectedZ=qnorm(row_number()/n()))%>%
+  ggplot(aes(x=expectedZ,y=forceStandardized))+
+  geom_point()+
+  geom_abline(aes(slope=1,intercept=0))+
+  labs(title="Q-Q plot",x="Expected Z-Score",y="Standardized Force Data",
+       caption = "The tails of the full data set are lighter than we would expected")
+
+
+```
