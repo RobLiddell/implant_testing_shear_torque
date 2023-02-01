@@ -1,0 +1,207 @@
+---
+title: "Inspect Data for Quality"
+author: "Robert Liddell"
+date: "2022-10-27"
+knit: (function(inputFile, encoding) {
+      rmarkdown::render(inputFile, encoding = encoding, output_dir = "html") })
+output: html_document
+---
+
+
+
+```{r Setup-Libraries Analysis Loading, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("rMarkdown/Support Code/dataAnalysisCode.R")
+```
+
+
+```{r Formatting Functions, include=FALSE}
+#Standardized table format
+tableFormat<-function(tib,capt=""){
+  tib %>% 
+    kbl(caption=capt) %>% 
+    kable_paper(full_width = T,"striped")
+}
+
+##Specify Default position_dodge characteristics
+pDodge<-position_dodge(width=0.3)
+
+##Plots the 95% confidence Interval with dat which specify term, upperCI and lowerCI
+#plotting function for 95% confidence interval
+term95ConfIntervalPlot<-function(dat){
+  p<-dat %>%
+    mutate(colour=if_else(CIupper*CIlower>0,'red','black')) %>% 
+    ggplot() +
+    geom_errorbar(aes(x=term,ymax=CIupper,ymin=CIlower,colour=colour), width=0.25) +
+    geom_hline(yintercept=0,lty=3)+
+    coord_flip()
+  return(p)
+}
+
+
+```
+
+# Goal
+The intention of this document is to inspect the data for quality and to understand the data we have
+
+## Data Summary
+
+The study was designed to place 240 implants (120/implant group) into 120 rats. with each implant being tested twice due to the lateral and medial arches this would result in 480 different test files if all samples were tested. These 480 different tests would be split between the 2 testing methods (Shear/Tension), 2 implant types (BAE/BAE+DCD), 2 arches (Lateral/Medial), 2 animal sides (Left/Right) and 6 time points (5/9/14/28/84/168 days). To simplify analysis this study will use the mean of the two arches, dropping samples which do not have both arches.
+```{r Data Summary-Counts}
+
+groupCounts %>% 
+  tableFormat("Table 1. N for each implant type and testing method")
+
+```
+The graph below shows the distribution of data from the different implant groups, testing methods, and time points. It is evident from this figure that the range of data gets larger with longer time points as the median anchorage increases. It is also evident that BAE+DCD implants have greater anchorage than the BAE implants, particularly at early time points.Lastly one can also see the heteroskedastic nature of the data with early time points having smaller deviation than later time points.
+
+```{r Data Summary-Box Plots}
+
+pDodge<-position_dodge(width=0.3)
+
+simpDat%>%
+  group_by(testMethod,time,implantType) %>%
+  summarise(Quarts=list(quantile(force)),
+            .groups="drop") %>% 
+  unnest_wider(Quarts) %>% 
+  ggplot(aes(x=factor(time),colour=implantType))+
+    geom_hline(aes(yintercept=0))+
+    geom_linerange(aes(ymin=`0%`,ymax=`100%`),lwd=1,position = pDodge)+
+    geom_linerange(aes(ymin= `25%`,ymax=`75%`),lwd=3,position = pDodge)+
+    geom_point(aes(y=`50%`),size=3,shape=3,position = pDodge)+
+    facet_grid(rows=vars(testMethod))+
+    labs(x="Time",y="Percentile",title="Distribution of Data",caption="Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles")+
+    theme_minimal()+
+    scale_color_manual(values=c("black","grey70"))
+
+```
+## Growth Curves
+
+The growth rats show that there is an initial peak between 5 days after which anchorage slows down significantly. While the trends between the two testing methods are similar the BAE+DCD implant has a higher peak growth in anchorage compared to the BAE implant
+
+```{r Growth Rates-% of Max}
+
+simpDat%>%
+  group_by(testMethod,time,implantType) %>%
+  summarise(force=median(force),.groups = "drop") %>%
+  add_row(expand_grid(testMethod=factor(c("Tension","Shear")),time=0,implantType=factor(c("BAE","BAE+DCD")),force=0)) %>% 
+  group_by(testMethod,implantType) %>% 
+  arrange(time) %>% 
+  mutate(nforce=(force/max(force))*100,
+         change=(nforce-lag(nforce))/(time-lag(time)),
+         time=(time+lag(time))/2, .keep="unused") %>% 
+  drop_na() %>% 
+  ggplot(aes(x=factor(time),y=change,colour=implantType,group=implantType))+
+  geom_line()+
+    facet_grid(rows=vars(testMethod))+
+    labs(x="Time",y="Growth Rate (%/Day)",title="Growth Over Time",caption="Figure 2. The rate of change in force between each time point for each implant")+
+    theme_minimal()+
+    scale_color_manual(values=c("black","grey70"))+
+  geom_hline(yintercept = 0)
+  
+```
+
+
+```{r Curve fitting-Reference fit CI and p-value}
+
+
+
+```
+
+```{r Boot Strapping Curve fitting}
+
+
+bootStrapResults %>% 
+  mutate(term=factor(term,levels = rev(c("Tau","Tt","Tn","Ttn","C","Ct","Cn","Ctn","D")))) %>% 
+  term95ConfIntervalPlot()
+
+
+bootStrap %>% 
+  select(trial,coef_info) %>% 
+  unnest(coef_info) %>% 
+  ggplot(aes(x=estimate)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(vars(term),scales="free_x")+
+  stat_summary(aes(xintercept = after_stat(x), y = 0), fun = median, geom = "vline", orientation = "y")
+
+
+
+```
+
+
+
+
+```{r Bootstrapping P-Values}
+eval.cdf.Pvalue <- function(FUN, ...) {
+  p<-FUN(...)
+  if(p<0.5){
+    return(2*p)
+  }else{
+    return(2*(1-p))
+  }
+}
+
+
+
+bootStrap %>% 
+  select(trial,coef_info) %>% 
+  unnest(coef_info) %>% 
+  select(term,estimate) %>% 
+  group_by(term) %>% 
+  summarise(cdf=list(ecdf(estimate))) %>% 
+  rowwise() %>% 
+  mutate(pVal=eval.cdf.Pvalue(cdf,0))
+
+
+```
+
+
+```{r plotting Confidence Interval of Graph}
+bootStrap %>% 
+  select(trial,coef_info) %>% 
+  unnest(coef_info) %>% 
+  select(trial,term,estimate) %>% 
+  pivot_wider(id_cols=trial,
+              names_from = term,
+              values_from = estimate) %>% 
+  expand_grid(time=c(1:168),tBin=c(0,1),nBin=c(0,1)) %>% 
+  mutate(force=(C+Ct*tBin+Cn*nBin)*(1-exp(-(time-D)/exp(Tau+Tt*tBin+Tn*nBin)))) %>% 
+  group_by(time,tBin,nBin) %>% 
+  summarise(confInterval=list(quantile(force,c(0.025,0.975))),
+            fit=median(force), .groups = "drop") %>% 
+  hoist(confInterval,`2.5%`=1,`97.5%`=2) %>% 
+  # mutate(`2.5%`=confInterval[[row_number()]][1]) %>% 
+  ggplot(aes(x=time)) +
+  facet_grid(rows=vars(nBin),
+             cols=vars(tBin))+
+  geom_ribbon(aes(ymin=`2.5%`,ymax=`97.5%`),alpha=0.8)+
+  geom_line(aes(y=fit))+
+  geom_point(data=nlsDat,aes(x=time,y=force))+
+  geom_hline(yintercept=0)+
+  geom_vline(xintercept=0)
+  
+
+```
+
+
+
+
+```{r}
+
+
+```
+
+
+
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
