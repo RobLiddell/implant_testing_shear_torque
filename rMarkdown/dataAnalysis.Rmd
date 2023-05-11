@@ -11,7 +11,7 @@ output: html_document
 
 ```{r Setup-Libraries Analysis Loading, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-source("rMarkdown/Support Code/dataAnalysisCode.R")
+source("Code\\dataAnalysisCode.R")
 ```
 
 
