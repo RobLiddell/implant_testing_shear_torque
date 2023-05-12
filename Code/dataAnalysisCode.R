@@ -21,6 +21,10 @@ data<-read_tsv(dataPath,col_types = list(col_character(),
 
 
 #Data setup and creation of dummy variables
+
+#simpDat is a simplified version of the data which has taken the mean of the two arches for a single implant
+#animalSide is also ignored
+
 simpDat<-data %>% 
   pivot_wider(id_cols = c(animalID,testMethod,time,implantType),
               names_from = c(archSide),
@@ -33,7 +37,8 @@ simpDat<-data %>%
   select(animalID,implantType,testMethod,time,force)
 
 
-
+#nlsDat uses simpDat and binarizes the testing method and implant surface. By coding the 
+#the variables as 1 or 0 they can be used in a function in the nls method.
 nlsDat<-simpDat %>% 
   mutate(tBin=if_else(testMethod=="Tension",1,0),
          nBin=if_else(implantType=="BAE+DCD",1,0))
@@ -90,7 +95,7 @@ groupCounts<-simpDat%>%
 
 ####Example NLS analysis with true data####
 if(FALSE){
-  nlsDat%>%
+  nlsAnalysis <- nlsDat%>%
     asymptoticNLS(cTermsNum=4, tauTermsNum=4) %>% 
     tidy() %>% 
     mutate(upperCI=estimate+std.error*1.96,
@@ -98,7 +103,7 @@ if(FALSE){
 }
 
 ####Bootstrapping NLS For Comparisons####
-nSim=100
+nSim=10
 set.seed(27)
 
 #Create Bootstraps
@@ -109,11 +114,11 @@ bootStraps<-tibble(trial=c(1:nSim)) %>%
                          slice_sample(prop=1,replace=TRUE))) %>%
   ungroup() %>%
   mutate(model = map(trialData, asymptoticNLS,cTermsNum=4, tauTermsNum=4))%>% 
-  rowwise() %>% 
-  mutate(keep=is_logical(unlist(model))) %>% 
-  filter(!keep) %>% 
+  # rowwise() %>% 
+  mutate(keep=!is_logical(unlist(model))) %>% 
+  filter(keep) %>% 
   select(-keep) %>% 
-  ungroup() %>% 
+  # ungroup() %>% 
   mutate(augmented=map(model,augment)) %>% 
   mutate(coef_info=map(model,tidy)) %>% 
   select(-model,-trialData)
