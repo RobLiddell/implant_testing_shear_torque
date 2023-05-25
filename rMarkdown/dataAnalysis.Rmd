@@ -1,5 +1,5 @@
 ---
-title: "Inspect Data for Quality"
+title: "Data Summary and Analysis"
 author: "Robert Liddell"
 date: "2022-10-27"
 knit: (function(inputFile, encoding) {
@@ -26,6 +26,11 @@ tableFormat<-function(tib,capt=""){
 ##Specify Default position_dodge characteristics
 pDodge<-position_dodge(width=0.3)
 
+##Figure Theme
+theme_set(theme_minimal()+theme(plot.caption = element_text(hjust = 0)))
+impCols <- scale_color_manual(values=c("black","grey70"))
+
+
 ##Plots the 95% confidence Interval with dat which specify term, upperCI and lowerCI
 #plotting function for 95% confidence interval
 term95ConfIntervalPlot<-function(dat){
@@ -42,16 +47,15 @@ term95ConfIntervalPlot<-function(dat){
 ```
 
 # Goal
-The intention of this document is to inspect the data for quality and to understand the data we have
+Summarize the data collected and perform statisitical analysis on results.
 
 ## Data Summary
 
 The study was designed to place 240 implants (120/implant group) into 120 rats. with each implant being tested twice due to the lateral and medial arches this would result in 480 different test files if all samples were tested. These 480 different tests would be split between the 2 testing methods (Shear/Tension), 2 implant types (BAE/BAE+DCD), 2 arches (Lateral/Medial), 2 animal sides (Left/Right) and 6 time points (5/9/14/28/84/168 days). To simplify analysis this study will use the mean of the two arches, dropping samples which do not have both arches.
-```{r Data Summary-Counts}
 
+```{r Data Summary-Counts}
 groupCounts %>% 
   tableFormat("Table 1. N for each implant type and testing method")
-
 ```
 The graph below shows the distribution of data from the different implant groups, testing methods, and time points. It is evident from this figure that the range of data gets larger with longer time points as the median anchorage increases. It is also evident that BAE+DCD implants have greater anchorage than the BAE implants, particularly at early time points.Lastly one can also see the heteroskedastic nature of the data with early time points having smaller deviation than later time points.
 
@@ -66,18 +70,17 @@ simpDat%>%
   unnest_wider(Quarts) %>% 
   ggplot(aes(x=factor(time),colour=implantType))+
     geom_hline(aes(yintercept=0))+
-    geom_linerange(aes(ymin=`0%`,ymax=`100%`),lwd=1,position = pDodge)+
-    geom_linerange(aes(ymin= `25%`,ymax=`75%`),lwd=3,position = pDodge)+
-    geom_point(aes(y=`50%`),size=3,shape=3,position = pDodge)+
+    geom_linerange(aes(ymin=`0%`,ymax=`100%`),linewidth=1,position = pDodge)+
+    geom_linerange(aes(ymin= `25%`,ymax=`75%`),linewidth=3,position = pDodge)+
+    geom_point(aes(y=`50%`),size=6,shape='_',position = pDodge)+
     facet_grid(rows=vars(testMethod))+
-    labs(x="Time",y="Percentile",title="Distribution of Data",caption="Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles")+
-    theme_minimal()+
-    scale_color_manual(values=c("black","grey70"))
+    labs(x="Time",y="Torque (Ncm)",title="Distribution of Data",caption="Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles")+
+    impCols
 
 ```
 ## Growth Curves
 
-The growth rats show that there is an initial peak between 5 days after which anchorage slows down significantly. While the trends between the two testing methods are similar the BAE+DCD implant has a higher peak growth in anchorage compared to the BAE implant
+The growth rates show that there is an initial peak between 5 and 9 days, after which anchorage slows down significantly. While the trends between the two testing methods are similar the BAE+DCD implant has a higher peak growth in anchorage compared to the BAE implant
 
 ```{r Growth Rates-% of Max}
 
@@ -92,26 +95,21 @@ simpDat%>%
          time=(time+lag(time))/2, .keep="unused") %>% 
   drop_na() %>% 
   ggplot(aes(x=factor(time),y=change,colour=implantType,group=implantType))+
-  geom_line()+
+  geom_line(linewidth=1)+
     facet_grid(rows=vars(testMethod))+
-    labs(x="Time",y="Growth Rate (%/Day)",title="Growth Over Time",caption="Figure 2. The rate of change in force between each time point for each implant")+
-    theme_minimal()+
-    scale_color_manual(values=c("black","grey70"))+
+    labs(x="Time",y="Growth Rate (%/Day)",title="Growth Over Time",caption="Figure 2. The rate of change in force between each time point for each implant.\nThe percent change per day indicates how much growth occured relative to\nthe peak measured anchorage.")+
+    impCols+
   geom_hline(yintercept = 0)
   
 ```
 
 
-```{r Curve fitting-Reference fit CI and p-value}
 
-
-
-```
 
 ```{r Boot Strapping Curve fitting}
 
 
-bootStrapResults %>% 
+bootStrap_results %>% 
   mutate(term=factor(term,levels = rev(c("Tau","Tt","Tn","Ttn","C","Ct","Cn","Ctn","D")))) %>% 
   term95ConfIntervalPlot()
 

@@ -49,7 +49,7 @@ nlsDat<-simpDat %>%
 ##Automated asymptotic model fitting function
 #Define model to fit
 asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
-                          startingValues=list(Tau = 3.1,Tt=0,Tn=-0.5,Ttn=-0.5, C=25,Ct=10,Cn=0,Ctn=0,D=2)) {
+                          startingValues=list(Tau = 3.1,Tt=0,Tn=-0.5,Ttn=-0.5, C=log(25),Ct=log(10+25)-log(25),Cn=0,Ctn=0,D=2)) {
   
   #Choose starting values for function
   startingValues<-startingValues[c(1:tauTermsNum,4+(1:cTermsNum),8+(1:dTermsNum))]
@@ -65,7 +65,7 @@ asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
     paste0(collapse = "+")
   
   #Generate the formula to use in the nls function
-  nlsFormula<-formula(str_glue("force~({cTerms})*(1-exp(-(time-{dTerms})/exp({tauTerms})))"))
+  nlsFormula<-formula(str_glue("force~exp({cTerms})*(1-exp(-(time-{dTerms})/exp({tauTerms})))"))
   
   #nls function is in a try statement in case the fit fails at the starting values provided
   fit<-try(nls(nlsFormula, dat,
@@ -93,37 +93,37 @@ groupCounts<-simpDat%>%
               values_from = Count,
               names_glue = "Day {.name}")
 
-####Example NLS analysis with true data####
+####Run First time to generate and save bootstrap data set####
 if(FALSE){
-  nlsAnalysis <- nlsDat%>%
-    asymptoticNLS(cTermsNum=4, tauTermsNum=4) %>% 
-    tidy() %>% 
-    mutate(upperCI=estimate+std.error*1.96,
-           lowerCI=estimate-std.error*1.96) 
+  nSim=10000
+  set.seed(27)
+  
+  bootStrap_data<-tibble(trial=c(1:nSim)) %>%
+    rowwise() %>%
+    mutate(trialData=list(nlsDat %>%
+                            group_by(testMethod,implantType,time) %>%
+                            slice_sample(prop=1,replace=TRUE))) %>%
+    ungroup() 
+  
+  bootStrap_data|>
+    save(file='Data/analysisData/st1BootstrapData.Rda')
 }
 
-####Bootstrapping NLS For Comparisons####
-nSim=10
-set.seed(27)
+####Analyze Bootstraps using NLS For Comparisons####
+load(file='Data/analysisData/st1BootstrapData.Rda')
 
-#Create Bootstraps
-bootStraps<-tibble(trial=c(1:nSim)) %>%
-  rowwise() %>%
-  mutate(trialData=list(nlsDat %>%
-                         group_by(testMethod,implantType,time) %>%
-                         slice_sample(prop=1,replace=TRUE))) %>%
-  ungroup() %>%
-  mutate(model = map(trialData, asymptoticNLS,cTermsNum=4, tauTermsNum=4))%>% 
-  # rowwise() %>% 
-  mutate(keep=!is_logical(unlist(model))) %>% 
+
+bootStrap_models <- bootStrap_data|>
+  mutate(model = map(trialData, asymptoticNLS,cTermsNum=3, tauTermsNum=3)) %>% 
+  mutate(keep=!is.na(model)) %>% 
   filter(keep) %>% 
   select(-keep) %>% 
-  # ungroup() %>% 
   mutate(augmented=map(model,augment)) %>% 
   mutate(coef_info=map(model,tidy)) %>% 
   select(-model,-trialData)
 
-bootStrapResults <- bootStraps %>% 
+
+bootStrap_results <- bootStrap_models %>% 
   select(-augmented) %>% 
   unnest(coef_info) %>% 
   group_by(term) %>% 
@@ -132,4 +132,5 @@ bootStrapResults <- bootStraps %>%
             CIlower=quantile(estimate,0.025),
             CIupper=quantile(estimate,0.975))
 
-########
+
+
