@@ -29,6 +29,7 @@ pDodge<-position_dodge(width=0.3)
 ##Figure Theme
 theme_set(theme_minimal()+theme(plot.caption = element_text(hjust = 0)))
 impCols <- scale_color_manual(values=c("black","grey70"))
+impFills <- scale_fill_manual(values=c("black","grey70"))
 
 
 ##Plots the 95% confidence Interval with dat which specify term, upperCI and lowerCI
@@ -39,6 +40,7 @@ term95ConfIntervalPlot<-function(dat){
     ggplot() +
     geom_errorbar(aes(x=term,ymax=CIupper,ymin=CIlower,colour=colour), width=0.25) +
     geom_hline(yintercept=0,lty=3)+
+    scale_colour_identity()+
     coord_flip()
   return(p)
 }
@@ -74,7 +76,7 @@ simpDat%>%
     geom_linerange(aes(ymin= `25%`,ymax=`75%`),linewidth=3,position = pDodge)+
     geom_point(aes(y=`50%`),size=6,shape='_',position = pDodge)+
     facet_grid(rows=vars(testMethod))+
-    labs(x="Time",y="Torque (Ncm)",title="Distribution of Data",caption="Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles")+
+    labs(x="Time (d)",y="Torque (Ncm)",title="Distribution of Data",caption="Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles")+
     impCols
 
 ```
@@ -97,12 +99,27 @@ simpDat%>%
   ggplot(aes(x=factor(time),y=change,colour=implantType,group=implantType))+
   geom_line(linewidth=1)+
     facet_grid(rows=vars(testMethod))+
-    labs(x="Time",y="Growth Rate (%/Day)",title="Growth Over Time",caption="Figure 2. The rate of change in force between each time point for each implant.\nThe percent change per day indicates how much growth occured relative to\nthe peak measured anchorage.")+
+    labs(x="Time (d)",y="Growth Rate (%/Day)",title="Growth Over Time",caption="Figure 2. The rate of change in force between each time point for each implant.\nThe percent change per day indicates how much growth occured relative to\nthe peak measured anchorage.")+
     impCols+
   geom_hline(yintercept = 0)
   
 ```
 
+```{r plotting Confidence Interval of Graph}
+bootStrap_fitCI %>% 
+  ggplot(aes(x=time, fill=implantType)) +
+  facet_grid(cols=vars(testMethod))+
+  geom_ribbon(aes(ymin=`2.5%`,ymax=`97.5%`),alpha=0.7)+
+  geom_line(aes(y=fit))+
+  geom_point(data=nlsDat,aes(x=time,y=force,fill=implantType),shape=21,colour='black')+
+  geom_hline(yintercept=0)+
+  geom_vline(xintercept=0)+
+  impFills+
+  labs(x="Time (d)",y="Torque (Ncm)",title="Asymptotic curve fit to Implant Anchorage", caption="Figure 3. Asymptotic curves fit to reverse torque data.")
+  
+bootStrap_results
+
+```
 
 
 
@@ -114,7 +131,7 @@ bootStrap_results %>%
   term95ConfIntervalPlot()
 
 
-bootStrap %>% 
+bootStrap_models %>% 
   select(trial,coef_info) %>% 
   unnest(coef_info) %>% 
   ggplot(aes(x=estimate)) +
@@ -141,7 +158,7 @@ eval.cdf.Pvalue <- function(FUN, ...) {
 
 
 
-bootStrap %>% 
+bootStrap_models %>% 
   select(trial,coef_info) %>% 
   unnest(coef_info) %>% 
   select(term,estimate) %>% 
@@ -154,32 +171,7 @@ bootStrap %>%
 ```
 
 
-```{r plotting Confidence Interval of Graph}
-bootStrap %>% 
-  select(trial,coef_info) %>% 
-  unnest(coef_info) %>% 
-  select(trial,term,estimate) %>% 
-  pivot_wider(id_cols=trial,
-              names_from = term,
-              values_from = estimate) %>% 
-  expand_grid(time=c(1:168),tBin=c(0,1),nBin=c(0,1)) %>% 
-  mutate(force=(C+Ct*tBin+Cn*nBin)*(1-exp(-(time-D)/exp(Tau+Tt*tBin+Tn*nBin)))) %>% 
-  group_by(time,tBin,nBin) %>% 
-  summarise(confInterval=list(quantile(force,c(0.025,0.975))),
-            fit=median(force), .groups = "drop") %>% 
-  hoist(confInterval,`2.5%`=1,`97.5%`=2) %>% 
-  # mutate(`2.5%`=confInterval[[row_number()]][1]) %>% 
-  ggplot(aes(x=time)) +
-  facet_grid(rows=vars(nBin),
-             cols=vars(tBin))+
-  geom_ribbon(aes(ymin=`2.5%`,ymax=`97.5%`),alpha=0.8)+
-  geom_line(aes(y=fit))+
-  geom_point(data=nlsDat,aes(x=time,y=force))+
-  geom_hline(yintercept=0)+
-  geom_vline(xintercept=0)
-  
 
-```
 
 
 

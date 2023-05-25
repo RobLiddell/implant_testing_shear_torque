@@ -70,7 +70,7 @@ asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
   #nls function is in a try statement in case the fit fails at the starting values provided
   fit<-try(nls(nlsFormula, dat,
                start = startingValues,
-               weights = dat%>%group_by(time,nBin,tBin) %>% mutate(wts=1/(sd(force)^2)) %>% pull(wts), 
+               weights = group_by(dat,time,nBin,tBin) %>% mutate(wts=1/(sd(force)^2)) %>% pull(wts), 
                control = nls.control(maxiter = 100, minFactor = 1/5000, warnOnly = TRUE),
                algorithm = 'port' ),
            silent = TRUE)
@@ -109,7 +109,7 @@ if(FALSE){
     save(file='Data/analysisData/st1BootstrapData.Rda')
 }
 
-####Analyze Bootstraps using NLS For Comparisons####
+####Analyze Bootstraps####
 load(file='Data/analysisData/st1BootstrapData.Rda')
 
 
@@ -133,4 +133,20 @@ bootStrap_results <- bootStrap_models %>%
             CIupper=quantile(estimate,0.975))
 
 
+bootStrap_fitCI <- bootStrap_models %>% 
+  select(trial,coef_info) %>% 
+  unnest(coef_info) %>% 
+  select(trial,term,estimate) %>% 
+  pivot_wider(id_cols=trial,
+              names_from = term,
+              values_from = estimate) %>% 
+  expand_grid(time=c(1:168),tBin=c(0,1),nBin=c(0,1)) %>% 
+  mutate(force=exp(C+Ct*tBin+Cn*nBin)*(1-exp(-(time-D)/exp(Tau+Tt*tBin+Tn*nBin)))) %>% 
+  group_by(time,tBin,nBin) %>% 
+  summarise(confInterval=list(quantile(force,c(0.025,0.975))),
+            fit=median(force), .groups = "drop") %>% 
+  hoist(confInterval,`2.5%`=1,`97.5%`=2) %>% 
+  mutate(testMethod=if_else(tBin==0,'Shear','Tension')|>factor(),
+         implantType=if_else(nBin==0,'BAE','BAE+DCD')|>factor(),
+         .keep='unused')
 
