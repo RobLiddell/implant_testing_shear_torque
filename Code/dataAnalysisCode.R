@@ -47,10 +47,8 @@ nlsDat<-simpDat %>%
 ####Functions####
 
 ##Automated asymptotic model fitting function
-#Define model to fit
-asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
-                          startingValues=list(Tau = 3.1,Tt=0,Tn=-0.5,Ttn=-0.5, C=log(25),Ct=log(10+25)-log(25),Cn=0,Ctn=0,D=2)) {
-  
+
+asymptoticFormula <- function(cTermsNum=3,tauTermsNum=3,dTermsNum=1){
   #Choose starting values for function
   startingValues<-startingValues[c(1:tauTermsNum,4+(1:cTermsNum),8+(1:dTermsNum))]
   
@@ -66,6 +64,13 @@ asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
   
   #Generate the formula to use in the nls function
   nlsFormula<-formula(str_glue("force~exp({cTerms})*(1-exp(-(time-{dTerms})/exp({tauTerms})))"))
+}
+
+#Define model to fit
+asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
+                          startingValues=list(Tau = 3.1,Tt=0,Tn=-0.5,Ttn=-0.5, C=log(25),Ct=log(10+25)-log(25),Cn=0,Ctn=0,D=2)) {
+  
+  nlsFormula <- asymptoticFormula(cTermsNum,tauTermsNum,dTermsNum)
   
   #nls function is in a try statement in case the fit fails at the starting values provided
   fit<-try(nls(nlsFormula, dat,
@@ -81,6 +86,58 @@ asymptoticNLS <- function(dat, cTermsNum=3, tauTermsNum=3, dTermsNum=1,
   }
   
 }
+####Asymptotic Comparitive####
+asymptoticNLS_comp <- function(dat) {
+  
+  bins <- c('','t*tBin','n*nBin')
+  cTerms <- paste0('C',bins,collapse = '+')
+  tauTerms <- paste0('Tau+',paste0('T',bins[-1],collapse='+'))
+  dTerms <- 'D'
+  
+  nlsFormula<-formula(str_glue("force~exp({cTerms})*(1-exp(-(time-{dTerms})/exp({tauTerms})))"))  
+  startingValues=list(Tau = 3.1,Tt=0,Tn=-0.5, C=log(25),Ct=log(10+25)-log(25),Cn=0,D=2)
+  
+  #nls function is in a try statement in case the fit fails at the starting values provided
+  fit<-try(nls(nlsFormula, dat,
+               start = startingValues,
+               weights = group_by(dat,time,nBin,tBin) %>% mutate(wts=1/(sd(force)^2)) %>% pull(wts), 
+               control = nls.control(maxiter = 100, minFactor = 1/5000, warnOnly = TRUE),
+               algorithm = 'port' ),
+           silent = TRUE)
+  if(inherits(fit,"try-error")){
+    return(NA)
+  }else{
+    return(fit)
+  }
+  
+}
+
+asymptoticNLS_base <- function(dat) {
+  
+  bins <- c('sm*(!tBin)*(!nBin)','tm*tBin*(!nBin)','sn*(!tBin)*nBin','tn*tBin*nBin')
+  cTerms <- paste0('C',bins,collapse = '+')
+  tauTerms <- paste0('T',bins,collapse='+')
+  dTerms <- 'D'
+  
+  nlsFormula<-formula(str_glue("force~exp({cTerms})*(1-exp(-(time-{dTerms})/exp({tauTerms})))"))  
+  startingValues=list(Tsm = 3.1,Ttm=3.1,Tsn=2.6,Ttn=2.6, Csm=3.5,Ctm=3,Csn=3.8,Ctn=3.3,D=2)
+  
+  #nls function is in a try statement in case the fit fails at the starting values provided
+  fit<-try(nls(nlsFormula, dat,
+               start = startingValues,
+               weights = group_by(dat,time,nBin,tBin) %>% mutate(wts=1/(sd(force)^2)) %>% pull(wts), 
+               control = nls.control(maxiter = 100, minFactor = 1/5000, warnOnly = TRUE),
+               algorithm = 'port' ),
+           silent = TRUE)
+  if(inherits(fit,"try-error")){
+    return(NA)
+  }else{
+    return(fit)
+  }
+  
+}
+
+
 
 
 
@@ -114,7 +171,7 @@ load(file='Data/analysisData/st1BootstrapData.Rda')
 
 
 bootStrap_models <- bootStrap_data|>
-  mutate(model = map(trialData, asymptoticNLS,cTermsNum=3, tauTermsNum=3)) %>% 
+  mutate(model = map(trialData, asymptoticNLS_comp)) %>% 
   mutate(keep=!is.na(model)) %>% 
   filter(keep) %>% 
   select(-keep) %>% 
@@ -150,3 +207,22 @@ bootStrap_fitCI <- bootStrap_models %>%
          implantType=if_else(nBin==0,'BAE','BAE+DCD')|>factor(),
          .keep='unused')
 
+
+bootStrap_models_base <- bootStrap_data|>
+  mutate(model = map(trialData, asymptoticNLS_base)) %>% 
+  mutate(keep=!is.na(model)) %>% 
+  filter(keep) %>% 
+  select(-keep) %>% 
+  mutate(augmented=map(model,augment)) %>% 
+  mutate(coef_info=map(model,tidy)) %>% 
+  select(-model,-trialData)
+
+
+bootStrap_results_base <- bootStrap_models_base %>% 
+  select(-augmented) %>% 
+  unnest(coef_info) %>% 
+  group_by(term) %>% 
+  summarise(Estimate=mean(estimate),
+            Std.Err=sd(estimate),
+            CIlower=quantile(estimate,0.025),
+            CIupper=quantile(estimate,0.975))
