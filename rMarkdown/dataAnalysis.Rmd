@@ -117,7 +117,7 @@ bootStrap_fitCI %>%
   impFills+
   labs(x="Time (d)",y="Torque (Ncm)",title="Asymptotic curve fit to Implant Anchorage", caption="Figure 3. Asymptotic curves fit to reverse torque data.")
   
-bootStrap_results
+bootStrap_results_base
 
 ```
 
