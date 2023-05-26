@@ -226,3 +226,25 @@ bootStrap_results_base <- bootStrap_models_base %>%
             Std.Err=sd(estimate),
             CIlower=quantile(estimate,0.025),
             CIupper=quantile(estimate,0.975))
+
+
+
+
+
+bootStrap_base_fitCI <- bootStrap_models_base %>% 
+  select(trial,coef_info) %>% 
+  unnest(coef_info) %>% 
+  select(trial,term,estimate) %>% 
+  pivot_wider(id_cols=trial,
+              names_from = term,
+              values_from = estimate) %>% 
+  expand_grid(time=c(1:168),tBin=c(0,1),nBin=c(0,1)) %>% 
+  mutate(force=exp(Csm*(!tBin)*(!nBin)+Ctm*tBin*(!nBin)+Csn*(!tBin)*nBin+Ctn*tBin*nBin)
+         *(1-exp(-(time-D)/exp(Tsm*(!tBin)*(!nBin)+Ttm*tBin*(!nBin)+Tsn*(!tBin)*nBin+Ttn*tBin*nBin)))) %>% 
+  group_by(time,tBin,nBin) %>% 
+  summarise(confInterval=list(quantile(force,c(0.025,0.975))),
+            fit=median(force), .groups = "drop") %>% 
+  hoist(confInterval,`2.5%`=1,`97.5%`=2) %>% 
+  mutate(testMethod=if_else(tBin==0,'Shear','Tension')|>factor(),
+         implantType=if_else(nBin==0,'BAE','BAE+DCD')|>factor(),
+         .keep='unused')

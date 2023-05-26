@@ -76,7 +76,7 @@ simpDat%>%
     geom_linerange(aes(ymin= `25%`,ymax=`75%`),linewidth=3,position = pDodge)+
     geom_point(aes(y=`50%`),size=6,shape='_',position = pDodge)+
     facet_grid(rows=vars(testMethod))+
-    labs(x="Time (d)",y="Torque (Ncm)",title="Distribution of Data",caption="Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles")+
+    labs(x="Time (d)",y="Torque (Ncm)",title="Distribution of Data",caption=str_wrap("Figure 1. The transitions indicate 0%, 25%, 50%, 75%, and 100% quartiles",width=100))+
     impCols
 
 ```
@@ -99,99 +99,66 @@ simpDat%>%
   ggplot(aes(x=factor(time),y=change,colour=implantType,group=implantType))+
   geom_line(linewidth=1)+
     facet_grid(rows=vars(testMethod))+
-    labs(x="Time (d)",y="Growth Rate (%/Day)",title="Growth Over Time",caption="Figure 2. The rate of change in force between each time point for each implant.\nThe percent change per day indicates how much growth occured relative to\nthe peak measured anchorage.")+
+    labs(x="Time (d)",y="Growth Rate (%/Day)",title="Growth Over Time",caption=str_wrap("Figure 2. The rate of change in force between each time point for each implant. The percent change per day indicates how much growth occured relative to the peak measured anchorage.",width=100))+
     impCols+
   geom_hline(yintercept = 0)
   
 ```
 
 ```{r plotting Confidence Interval of Graph}
-bootStrap_fitCI %>% 
+
+temp <- bootStrap_results_base|>
+  filter(!startsWith(term,'D'))|>
+  mutate(implantType=if_else(str_detect(term,'n'),'BAE+DCD','BAE'),
+         testMethod=if_else(str_detect(term,'s'),'Shear','Tension'),
+         term=str_sub(term,end=1))|>
+  pivot_wider(id_cols=c(implantType,testMethod),
+              names_from = term,
+              values_from = c(Estimate,CIupper,CIlower))
+
+bootStrap_base_fitCI %>% 
   ggplot(aes(x=time, fill=implantType)) +
   facet_grid(cols=vars(testMethod))+
   geom_ribbon(aes(ymin=`2.5%`,ymax=`97.5%`),alpha=0.7)+
   geom_line(aes(y=fit))+
-  geom_point(data=nlsDat,aes(x=time,y=force,fill=implantType),shape=21,colour='black')+
+  # geom_point(data=nlsDat,aes(x=time,y=force,fill=implantType),shape=21,colour='black')+
   geom_hline(yintercept=0)+
   geom_vline(xintercept=0)+
+  geom_hline(data=temp,aes(yintercept=exp(Estimate_C),colour=implantType),lty=2,linewidth=1)+
+  geom_linerange(data=temp,aes(ymin=0,ymax=exp(Estimate_C),x=exp(Estimate_T),colour=implantType),lty=3,linewidth=1)+
   impFills+
-  labs(x="Time (d)",y="Torque (Ncm)",title="Asymptotic curve fit to Implant Anchorage", caption="Figure 3. Asymptotic curves fit to reverse torque data.")
+  impCols+
+  labs(x="Time (d)",y="Torque (Ncm)",title="Asymptotic curve fit to Implant Anchorage", caption=str_wrap("Figure 3. Asymptotic curves fit to reverse torque data.",widht=100))
   
-bootStrap_results_base
-
-```
-
-
-
-```{r Boot Strapping Curve fitting}
-
-
-bootStrap_results %>% 
-  mutate(term=factor(term,levels = rev(c("Tau","Tt","Tn","Ttn","C","Ct","Cn","Ctn","D")))) %>% 
-  term95ConfIntervalPlot()
-
-
-bootStrap_models %>% 
-  select(trial,coef_info) %>% 
-  unnest(coef_info) %>% 
-  ggplot(aes(x=estimate)) +
-  geom_histogram(bins = 20) +
-  facet_wrap(vars(term),scales="free_x")+
-  stat_summary(aes(xintercept = after_stat(x), y = 0), fun = median, geom = "vline", orientation = "y")
-
 
 
 ```
 
 
 
-
-```{r Bootstrapping P-Values}
-eval.cdf.Pvalue <- function(FUN, ...) {
-  p<-FUN(...)
-  if(p<0.5){
-    return(2*p)
-  }else{
-    return(2*(1-p))
-  }
-}
-
-
-
-bootStrap_models %>% 
-  select(trial,coef_info) %>% 
-  unnest(coef_info) %>% 
-  select(term,estimate) %>% 
-  group_by(term) %>% 
-  summarise(cdf=list(ecdf(estimate))) %>% 
-  rowwise() %>% 
-  mutate(pVal=eval.cdf.Pvalue(cdf,0))
-
-
-```
-
-
-
-
-
-
-
-```{r}
-
-
-```
-
-
-
-
-```{r}
+```{r Parameter Comparison}
+bootStrap_results|>
+  filter(str_detect(term,'[nt]$'))|>
+  mutate(Nano=endsWith(term,'n'),
+         Tension=endsWith(term,'t'),
+         term=str_sub(term,end=1))|>
+  pivot_wider(id_cols = c(Nano,Tension),
+              names_from = term,
+              values_from = c(Estimate,CIlower,CIupper))|>
+  mutate(Effect=if_else(Nano,'Nano','Tension'))|>
+  select(-Nano,-Tension)|>
+  ggplot()+
+  geom_hline(yintercept=1)+
+  geom_vline(xintercept=1)+
+  geom_errorbar(aes(x=exp(Estimate_T),ymax=exp(CIupper_C),ymin=exp(CIlower_C)),width=0.03)+
+  geom_errorbar(aes(y=exp(Estimate_C),xmax=exp(CIupper_T),xmin=exp(CIlower_T)),width=0.05)+
+  geom_point(aes(x=exp(Estimate_T),y=exp(Estimate_C),colour=Effect),size=3)+
+  impCols+
+  labs(x="Tau (d)",y="C (Ncm)",title="Relative Effect of testing method and Implant Surface", caption=str_wrap("Figure 4. 95% CI for the relative multiplicative effect of Nanotopography and Tensile testing method. CI's which do no overlap 1 result in a significant increase or decrease to the base parameter. Interactions between nanotopography and tension testing were not different from 1.", width=100))
 
 
 
 ```
-
-
-
 
 
 
