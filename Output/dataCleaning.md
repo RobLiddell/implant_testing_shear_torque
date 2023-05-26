@@ -61,7 +61,11 @@ legendData<-read_tsv(legend,col_types = list(col_character(), #Setting all of th
                values_to = "ImplantType")%>%
   mutate(animalSide=if_else(animalSide=="Left","L","R"))%>% 
   select(-Sacrifice_Date,-testMeth)
+
+print(getwd())
 ```
+
+    [1] "C:/Users/user/Documents/My Publications/ST1/ShearTorqProj/rMarkdown"
 
 ## Data Cleaning
 
@@ -98,34 +102,27 @@ Here I want to look for data values which lie outside expected values
 print("These results are outside of the expected time points")
 ```
 
-    ## [1] "These results are outside of the expected time points"
+    [1] "These results are outside of the expected time points"
 
 ``` r
 data%>%
   filter(!(time %in% c(5,9,14,28,84,168)))
 ```
 
-    ## # A tibble: 7 × 7
-    ##   animalID animalSide archSide force testMethod implantType  time
-    ##   <chr>    <fct>      <fct>    <dbl> <fct>      <fct>       <dbl>
-    ## 1 121      Left       Lateral   3.81 Tension    BAE            27
-    ## 2 121      Left       Medial    1.42 Tension    BAE            27
-    ## 3 121      Right      Lateral   9.81 Tension    BAE+DCD        27
-    ## 4 121      Right      Medial   11.0  Tension    BAE+DCD        27
-    ## 5 122      Left       Medial   40.7  Shear      BAE+DCD        27
-    ## 6 122      Right      Lateral  16.4  Shear      BAE            27
-    ## 7 122      Right      Medial   14.6  Shear      BAE            27
+    # A tibble: 7 × 7
+      animalID animalSide archSide force testMethod implantType  time
+      <chr>    <fct>      <fct>    <dbl> <fct>      <fct>       <dbl>
+    1 121      Left       Lateral   3.81 Tension    BAE            27
+    2 121      Left       Medial    1.42 Tension    BAE            27
+    3 121      Right      Lateral   9.81 Tension    BAE+DCD        27
+    4 121      Right      Medial   11.0  Tension    BAE+DCD        27
+    5 122      Left       Medial   40.7  Shear      BAE+DCD        27
+    6 122      Right      Lateral  16.4  Shear      BAE            27
+    7 122      Right      Medial   14.6  Shear      BAE            27
 
 ``` r
 #Correct the finding that some times ar 27 instead of 28
 
 cleanedData<-data%>%
   mutate(time=if_else(time==27,28,time))
-```
-
-``` r
-saveLoc<-"../Data/formattedData/ST1_Data_Cleaned.txt"
-
-cleanedData%>%
-  write_tsv(saveLoc)
 ```

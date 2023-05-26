@@ -110,7 +110,7 @@ data%>%
 
 ```
 
-```{r Data Rectifing}
+```{r Fixing Time}
 #Correct the finding that some times ar 27 instead of 28
 
 cleanedData<-data%>%
@@ -118,10 +118,11 @@ cleanedData<-data%>%
 
 ```
 
-```{r Data Saving}
+```{r Data Saving, include=FALSE}
+if(FALSE){
 saveLoc<-"../Data/formattedData/ST1_Data_Cleaned.txt"
 
 cleanedData%>%
   write_tsv(saveLoc)
-
+}
 ```

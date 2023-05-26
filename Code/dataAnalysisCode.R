@@ -8,7 +8,7 @@ library(lubridate)
 library(kableExtra)
 
 ####Data Loading and Formatting####
-dataPath<-"Data/formattedData/ST1_Data_Cleaned.txt"
+dataPath<-"Data\\formattedData\\ST1_Data_Cleaned.txt"
 
 data<-read_tsv(dataPath,col_types = list(col_character(),
                                          col_factor(levels=c("Right","Left")),

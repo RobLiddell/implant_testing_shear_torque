@@ -5,12 +5,14 @@ date: "2022-10-27"
 knit: (function(inputFile, encoding) {
       rmarkdown::render(inputFile, encoding = encoding, output_dir = "html") })
 output: html_document
+always_allow_html: true
 ---
 
 
 
 ```{r Setup-Libraries Analysis Loading, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "C://Users//user//Documents//My Publications//ST1//ShearTorqProj")
 source("Code\\dataAnalysisCode.R")
 ```
 
@@ -56,8 +58,10 @@ Summarize the data collected and perform statisitical analysis on results.
 The study was designed to place 240 implants (120/implant group) into 120 rats. with each implant being tested twice due to the lateral and medial arches this would result in 480 different test files if all samples were tested. These 480 different tests would be split between the 2 testing methods (Shear/Tension), 2 implant types (BAE/BAE+DCD), 2 arches (Lateral/Medial), 2 animal sides (Left/Right) and 6 time points (5/9/14/28/84/168 days). To simplify analysis this study will use the mean of the two arches, dropping samples which do not have both arches.
 
 ```{r Data Summary-Counts}
-groupCounts %>% 
+groupCounts %>%
   tableFormat("Table 1. N for each implant type and testing method")
+
+# groupCounts
 ```
 The graph below shows the distribution of data from the different implant groups, testing methods, and time points. It is evident from this figure that the range of data gets larger with longer time points as the median anchorage increases. It is also evident that BAE+DCD implants have greater anchorage than the BAE implants, particularly at early time points.Lastly one can also see the heteroskedastic nature of the data with early time points having smaller deviation than later time points.
 
@@ -84,7 +88,7 @@ simpDat%>%
 
 The growth rates show that there is an initial peak between 5 and 9 days, after which anchorage slows down significantly. While the trends between the two testing methods are similar the BAE+DCD implant has a higher peak growth in anchorage compared to the BAE implant
 
-```{r Growth Rates-% of Max}
+```{r Growth Rates}
 
 simpDat%>%
   group_by(testMethod,time,implantType) %>%
@@ -105,7 +109,7 @@ simpDat%>%
   
 ```
 
-```{r plotting Confidence Interval of Graph}
+```{r Confidence Interval}
 
 temp <- bootStrap_results_base|>
   filter(!startsWith(term,'D'))|>
@@ -128,7 +132,7 @@ bootStrap_base_fitCI %>%
   geom_linerange(data=temp,aes(ymin=0,ymax=exp(Estimate_C),x=exp(Estimate_T),colour=implantType),lty=3,linewidth=1)+
   impFills+
   impCols+
-  labs(x="Time (d)",y="Torque (Ncm)",title="Asymptotic curve fit to Implant Anchorage", caption=str_wrap("Figure 3. Asymptotic curves fit to reverse torque data.",widht=100))
+  labs(x="Time (d)",y="Torque (Ncm)",title="Asymptotic curve fit to Implant Anchorage", caption=str_wrap("Figure 3. Asymptotic curves fit to reverse torque data.",width=100))
   
 
 
